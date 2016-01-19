@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html style="width:100%;height:100%;overflow:hidden;padding:0;margin:0;">
+<head>
+<meta http-equiv="content-type" content="text/html;charset=utf-8">
+<title>正方体</title>
+</head>
+<body style="width:100%;height:100%;overflow:hidden;margin:0;padding:0;">
+    <div id="container" >
+        <canvas width="500" height="500" id="js_canvas"></canvas>
+    </div>
+<script src="js/glMatrix.js"></script>
+<script>
+var width = window.innerWidth;
+var height = window.innerHeight;
+var util = {
+    /*
+        gl : 上下文
+        vertexShaderSource ： 定点着色器
+        fragmentShaderSource ： 片源着色器
+    */
+    initShader : function(gl, vertexShaderSource, fragmentShaderSource) {
+        var fragmentShader = this.createShader(gl, fragmentShaderSource, "fragment"),
+            vertexShader   = this.createShader(gl, vertexShaderSource, "vertex"),
+            shaderProgram;
+        // link them together into a new program
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            throw("Could not initialise shaders");
+            return null;
+        }
+        gl.useProgram( shaderProgram );
+        return shaderProgram;
+    },
+    createShader : function(gl, str, type) {
+        var shader;
+        if (type == "fragment") {
+            shader = gl.createShader( gl.FRAGMENT_SHADER );
+        } else if (type == "vertex") {
+            shader = gl.createShader( gl.VERTEX_SHADER );
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    },
+    initArrayBuffer : function( gl, program, vertices, n, attribute ) {
+        var vertexBuffer = gl.createBuffer();
+        if( !vertexBuffer ) {
+            throw 'Failed:缓冲区创建失败';
+            return null;
+        }
+        gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
+        gl.bufferData( gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        attribute = gl.getAttribLocation(program, attribute);
+        gl.vertexAttribPointer( attribute, n, gl.FLOAT, false,  0, 0);
+        gl.enableVertexAttribArray( attribute );
+    },
+    getgl : function( selector ) {
+        var ele = document.querySelector( selector ),
+            gl;
+        ele.width = width,ele.height = height;
+        gl = ele.getContext( 'webgl' ) || ele.getContext( 'experimental-webgl' );
+        return gl;
+    },
+    clear : function( gl ) {
+        gl.clearColor(.0, .0, .0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BYTE);
+    }
+};
+(function() {
+
+    var gl = util.getgl( '#js_canvas' ),
+        vertexShader = [
+            'attribute vec4 a_Position;',
+            'attribute vec4 a_Color;',
+            'uniform mat4 u_MvpMatrix;',
+            'varying vec4 v_Color;',
+            'void main(){',
+            ' gl_Position = u_MvpMatrix * a_Position;',
+            ' v_Color = a_Color;',
+            '}'
+        ].join('\n'),
+        fragmentShader = [
+            'precision mediump float;',
+            'varying vec4 v_Color;',
+            'void main(){',
+            ' gl_FragColor = v_Color;',
+            '}'
+        ].join('\n'),
+        /*
+        vertices = new Float32Array([
+             1.0, 1.0, 1.0,  -1.0, 1.0, 1.0,  -1.0,-1.0, 1.0,   1.0,-1.0, 1.0, // v0-v1-v2-v3 front
+             1.0, 1.0, 1.0,   1.0,-1.0, 1.0,   1.0,-1.0,-1.0,   1.0, 1.0,-1.0, // v0-v3-v4-v5 right
+             1.0, 1.0, 1.0,   1.0, 1.0,-1.0,  -1.0, 1.0,-1.0,  -1.0, 1.0, 1.0, // v0-v5-v6-v1 up
+            -1.0, 1.0, 1.0,  -1.0, 1.0,-1.0,  -1.0,-1.0,-1.0,  -1.0,-1.0, 1.0, // v1-v6-v7-v2 left
+            -1.0,-1.0,-1.0,   1.0,-1.0,-1.0,   1.0,-1.0, 1.0,  -1.0,-1.0, 1.0, // v7-v4-v3-v2 down
+             1.0,-1.0,-1.0,  -1.0,-1.0,-1.0,  -1.0, 1.0,-1.0,   1.0, 1.0,-1.0  // v4-v7-v6-v5 back
+        ]),
+        color_vertices = new Float32Array([
+            1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0,     // v0-v1-v2-v3 front
+            1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0,     // v0-v3-v4-v5 right
+            1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0,     // v0-v5-v6-v1 up
+            1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0,     // v1-v6-v7-v2 left
+            1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0,     // v7-v4-v3-v2 down
+            1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0　    // v4-v7-v6-v5 back
+        ]),
+        indices = new Uint8Array([
+             0, 1, 2,   0, 2, 3,    // front
+             4, 5, 6,   4, 6, 7,    // right
+             8, 9,10,   8,10,11,    // up
+            12,13,14,  12,14,15,    // left
+            16,17,18,  16,18,19,    // down
+            20,21,22,  20,22,23     // back
+        ]),*/
+        vertices = new Float32Array([
+            1, 1, 1,
+            -1, 1, 1,
+            -1, -1, 1,
+            1, -1, 1,
+            1, -1, -1,
+            1, 1, -1,
+            -1, 1, -1,
+            -1, -1, -1
+        ]),
+        color_vertices = new Float32Array([
+            1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0,
+            1, 0, 0,   1, 0, 0,   1, 0, 0,  1, 0, 0
+            //1, 1, 0,   1, 1, 0,   1, 1, 0,  1, 1, 0
+        ]),
+        indices = new Uint8Array([
+            0, 1, 2, 0, 2, 3,
+            0, 3, 4, 0, 4, 5,
+            0, 5, 6, 0, 6, 1,
+            1, 6, 7, 1, 7, 2,
+            7, 4, 3, 7, 3, 2,
+            4, 7, 6, 4, 6, 5
+        ]),
+        program = util.initShader( gl, vertexShader, fragmentShader ),
+        u_MvpMatrix = gl.getUniformLocation( program, 'u_MvpMatrix'),
+        mvpMatrix = mat4.identity( mat4.create() );
+        
+    util.initArrayBuffer( gl, program, vertices, 3, 'a_Position' );
+    util.initArrayBuffer( gl, program, color_vertices, 3, 'a_Color' );
+
+    gl.bindBuffer( gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer() );
+    gl.bufferData( gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);//指定各个面各个顶点索引值
+    
+    var perMatrix = mat4.create(),
+        viewMatrix = mat4.create(),
+        modelMatrix = mat4.identity( mat4.create() );
+    mat4.perspective(30, width / height , 1, 100, perMatrix);
+    mat4.lookAt( [6, 6, 14], [0, 0, 0], [0, 1, 0], viewMatrix );
+    mat4.translate( modelMatrix,[0,2,0] );
+    mat4.multiply(perMatrix, viewMatrix, mvpMatrix);
+    mat4.multiply(mvpMatrix,modelMatrix,mvpMatrix);
+
+    gl.uniformMatrix4fv(u_MvpMatrix, false, mvpMatrix);
+    
+    util.clear( gl );
+    gl.enable( gl.DEPTH_TEST );//隐藏面消除
+    gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_BYTE, 0);
+    /*
+        gl.POINTS
+        gl.LINES
+        gl.LINE_STRIP
+        gl.LINE_LOOP
+        gl.TRIANGLES
+        gl.TRIANGLE_STRIP
+        gl.TRIANGLE_FAN
+    */
+
+function animate() {
+    
+}
+animate();
+})()
+</script>
+
+</body>
+</html>

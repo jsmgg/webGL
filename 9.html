@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html;charset=utf-8">
+<title>图片纹理</title>
+</head>
+<body>
+    <div id="container" >
+        <canvas width="500" height="500" id="js_canvas"></canvas>
+    </div>
+<script>
+var util = {
+    /*
+        gl : 上下文
+        vertexShaderSource ： 定点着色器
+        fragmentShaderSource ： 片源着色器
+    */
+    initShader : function(gl, vertexShaderSource, fragmentShaderSource) {
+        var fragmentShader = this.createShader(gl, fragmentShaderSource, "fragment"),
+            vertexShader = this.createShader(gl, vertexShaderSource, "vertex"),
+            shaderProgram, shaderVertexPositionAttribute, shaderProjectionMatrixUniform,
+            shaderModelViewMatrixUniform;
+        // link them together into a new program
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            throw("Could not initialise shaders");
+            return null;
+        }
+        gl.useProgram( shaderProgram );
+        return shaderProgram;
+    },
+    createShader : function(gl, str, type) {
+        var shader;
+        if (type == "fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (type == "vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    },
+    initVertexBuffers : function( gl , program , vertices , key , color) {
+        var vertexBuffer = gl.createBuffer(),
+            varindex, a_color, FSIZE = vertices.BYTES_PER_ELEMENT;
+        if( !vertexBuffer ) {
+            throw 'Failed:缓冲区创建失败';
+            return null;
+        }
+        gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
+        gl.bufferData( gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        varindex = gl.getAttribLocation(program, 'a_Position');
+        gl.vertexAttribPointer( varindex, 2, gl.FLOAT, false,  FSIZE * 4, 0);
+        gl.enableVertexAttribArray( varindex );
+        a_color = gl.getAttribLocation(program, 'a_TexCoord');
+        gl.vertexAttribPointer( a_color, 2, gl.FLOAT, false, FSIZE *4 , FSIZE * 2);
+        gl.enableVertexAttribArray( a_color );
+        return true;
+    },
+    getgl : function( selector ) {
+        var ele = document.querySelector( selector ),
+            gl = ele.getContext( 'webgl' );
+        return gl;
+    },
+    clear : function( gl ) {
+        gl.clearColor(.0, .0, .0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+    },
+    initTextures : function(gl, program, n, key, src) {
+        var self = this,
+            texture = gl.createTexture(),
+            u_Sampler = gl.getUniformLocation( program, key),
+            image = new Image();
+        image.onload = function() {
+            self.loadTexture(gl, n, texture, u_Sampler, this);
+        }
+        image.src = src;
+    },
+    loadTexture : function(gl, n, texture, u_Sampler, image) {
+        //gl.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, 1);
+        gl.activeTexture( gl.TEXTTURE0 );
+        gl.bindTexture( gl.TEXTURE_2D, texture);
+        gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+        gl.uniform1i( u_Sampler, 0);
+        util.clear( gl );
+        gl.drawArrays( gl.TRIANGLE_STRIP, 0, n);
+    }
+};
+(function() {
+
+    var gl = util.getgl( '#js_canvas' ),
+        vertexShader = [
+            'attribute vec4 a_Position;',
+            'attribute vec2 a_TexCoord;',
+            'varying vec2 v_TexCoord;',
+            'void main(){',
+            ' gl_Position = a_Position;',
+            ' v_TexCoord = a_TexCoord;',
+            '}'
+        ].join('\n'),
+        fragmentShader = [
+            'precision mediump float;',
+            'uniform sampler2D u_Sampler;',
+            'varying vec2 v_TexCoord;',
+            'void main(){',
+            ' gl_FragColor = texture2D(u_Sampler,v_TexCoord);',
+            '}'
+        ].join('\n'),
+        vertices = new Float32Array([
+            -0.5, 0.5, 0.0, 1.0,
+            -0.5, -0.5, 0.0, 0.0,
+            0.5,0.5, 1.0, 1.0,
+            0.5, -0.5, 1.0, 0.0
+        ]),
+        program;
+    program = util.initShader( gl, vertexShader, fragmentShader);
+    util.initVertexBuffers( gl, program, vertices, 'a_Position', 'a_TexCoord');
+    util.initTextures( gl, program, 4, 'u_Sampler', 'img/pano_b.jpg');
+    /*
+        gl.POINTS
+        gl.LINES
+        gl.LINE_STRIP
+        gl.LINE_LOOP
+        gl.TRIANGLES
+        gl.TRIANGLE_STRIP
+        gl.TRIANGLE_FAN
+    */
+    
+
+
+})()
+</script>
+
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html;charset=utf-8">
+<title>画点</title>
+</head>
+<body>
+    <div id="container" >
+        <canvas width="500" height="500" id="js_canvas"></canvas>
+    </div>
+<script>
+var util = {
+    /*
+        gl : 上下文
+        vertexShaderSource ： 定点着色器
+        fragmentShaderSource ： 片源着色器
+    */
+    initShader : function(gl, vertexShaderSource, fragmentShaderSource) {
+        var fragmentShader = this.createShader(gl, fragmentShaderSource, "fragment"),
+            vertexShader = this.createShader(gl, vertexShaderSource, "vertex"),
+            shaderProgram, shaderVertexPositionAttribute, shaderProjectionMatrixUniform,
+            shaderModelViewMatrixUniform;
+        // link them together into a new program
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+        // get pointers to the shader params
+        //shaderVertexPositionAttribute = gl.getAttribLocation(shaderProgram, "vertexPos");
+        //gl.enableVertexAttribArray(shaderVertexPositionAttribute);
+        //shaderProjectionMatrixUniform = gl.getUniformLocation(shaderProgram, "projectionMatrix");
+        ///shaderModelViewMatrixUniform = gl.getUniformLocation(shaderProgram, "modelViewMatrix");
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+        gl.useProgram( shaderProgram );
+        return shaderProgram;
+    },
+    createShader : function(gl, str, type) {
+        var shader;
+        if (type == "fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (type == "vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    },
+    getgl : function( selector ) {
+        var ele = document.querySelector( selector ),
+            gl = ele.getContext( 'webgl' );
+        return gl;
+    },
+    clear : function( gl ) {
+        gl.clearColor(.0, .0, .0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+};
+(function() {
+
+    var gl = util.getgl( '#js_canvas' ),
+        vertexShader = [
+            'attribute vec4 a_Position;',
+            'attribute float size;',
+            'void main(){',
+            ' gl_Position = a_Position;',
+            ' gl_PointSize = size;',
+            '}'
+        ].join('\n'),
+        fragmentShader = [
+            'void main(){',
+            ' gl_FragColor = vec4(1.0, .0, .0, 1.0);',
+            '}'
+        ].join('\n'),
+        program, a_Position, size;
+    util.clear( gl );
+    program = util.initShader( gl, vertexShader, fragmentShader);
+    a_Position = gl.getAttribLocation( program, 'a_Position');
+    size = gl.getAttribLocation( program, 'size');
+
+    var points = [];
+    bind();
+    function bind(){
+        var dom = document.getElementById( 'js_canvas' );
+        dom.addEventListener('mousemove', function( e ) {
+            var x = e.clientX, y = e.clientY,
+                rect = e.target.getBoundingClientRect();
+            util.clear( gl );
+            x = ( (x - rect.left) - dom.width / 2) / ( dom.width / 2 );
+            y = ( dom.height / 2 - ( y - rect.top )) / ( dom.height / 2 );
+            points.push({x:x,y:y});
+            for(var i = 0; i< points.length; i++) {
+                gl.vertexAttrib3f( a_Position, points[i].x, points[i].y, 0.0);
+                gl.vertexAttrib1f( size, 10.0);
+                gl.drawArrays( gl.POINTS, 0, 1);
+            }
+        }, false);
+        dom.addEventListener('click', function(){
+            points=[];
+        }, false);
+    
+    }
+})()
+</script>
+
+</body>
+</html>

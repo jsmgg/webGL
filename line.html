@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html;charset=utf-8">
+<title>画线</title>
+<script src="js/three_46.js"></script>
+</head>
+<body>
+    <div id="container" ></div>
+<script>
+(function() {
+
+var container,camera, radius = 50, count = 120, renderer;
+container = document.getElementById( 'container' );
+camera = new THREE.PerspectiveCamera( 90, window.innerWidth / window.innerWidth, 1, 4000);//创建相机
+camera.position.set( 0 , 0 , 200);//设置相机位置
+scene = new THREE.Scene();
+
+for(var i = 1; i < 10; i++){
+    scene.add( getline( 50+i*3 , i*3) );    
+}
+
+renderer = new THREE.WebGLRenderer( {antialias : true} );
+renderer.setSize( window.innerWidth, window.innerHeight );
+container.appendChild( renderer.domElement );
+renderer.render( scene, camera );
+
+
+function getline( radius , y){
+    var geometry,material,line;
+    geometry = new THREE.Geometry();
+    for(var i = 0; i <= count; i++) {
+        var x = radius * Math.cos( i / count * (Math.PI * 2));
+        var z = radius * Math.sin( i / count * (Math.PI * 2));
+        var vertex = new THREE.Vertex (new THREE.Vector3(x, y, z));
+        geometry.vertices.push(vertex);
+    }
+    material = new THREE.LineBasicMaterial( {
+        color : 0xff0000 , opacity : .5, lineWidth : 2
+    } );
+    line = new THREE.Line( geometry, material );
+    line.rotation.x = Math.PI / 4;
+    return line ;
+}
+
+
+})()
+</script>
+
+</body>
+</html>

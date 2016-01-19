@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html;charset=utf-8">
+<title>图片纹理</title>
+</head>
+<body>
+    <div id="container" >
+        <canvas width="500" height="500" id="js_canvas"></canvas>
+    </div>
+<script src="js/glMatrix.js"></script>
+<script>
+var width = 600;//document.documentElement.offsetWidth;
+var height = 400;//document.documentElement.offsetHeight;
+var util = {
+    /*
+        gl : 上下文
+        vertexShaderSource ： 定点着色器
+        fragmentShaderSource ： 片源着色器
+    */
+    initShader : function(gl, vertexShaderSource, fragmentShaderSource) {
+        var fragmentShader = this.createShader(gl, fragmentShaderSource, "fragment"),
+            vertexShader = this.createShader(gl, vertexShaderSource, "vertex"),
+            shaderProgram, shaderVertexPositionAttribute, shaderProjectionMatrixUniform,
+            shaderModelViewMatrixUniform;
+        // link them together into a new program
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            throw("Could not initialise shaders");
+            return null;
+        }
+        gl.useProgram( shaderProgram );
+        return shaderProgram;
+    },
+    createShader : function(gl, str, type) {
+        var shader;
+        if (type == "fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (type == "vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    },
+    initVertexBuffers : function( gl , program , vertices , a_Position , a_TexCoord) {
+        var vertexBuffer = gl.createBuffer(),
+            FSIZE = vertices.BYTES_PER_ELEMENT;
+        if( !vertexBuffer ) {
+            throw 'Failed:缓冲区创建失败';
+            return null;
+        }
+        gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
+        gl.bufferData( gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        a_Position = gl.getAttribLocation(program, a_Position);
+        gl.vertexAttribPointer( a_Position, 3, gl.FLOAT, false,  FSIZE * 5, 0);
+        gl.enableVertexAttribArray( a_Position );
+        a_TexCoord = gl.getAttribLocation(program, a_TexCoord);
+        gl.vertexAttribPointer( a_TexCoord, 2, gl.FLOAT, false, FSIZE *5 , FSIZE * 3);
+        gl.enableVertexAttribArray( a_TexCoord );
+        return true;
+    },
+    getgl : function( selector ) {
+        var ele = document.querySelector( selector ),
+            gl;
+        ele.width = width,ele.height = height;
+        gl = ele.getContext( 'webgl' ) || ele.getContext( 'experimental-webgl' );
+        return gl;
+    },
+    clear : function( gl ) {
+        gl.clearColor(.0, .0, .0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+    },
+    initTextures : function(gl, program, n, key, image) {
+        var self = this,
+            texture = gl.createTexture(),
+            u_Sampler = gl.getUniformLocation( program, key);
+        gl.pixelStorei( gl.UNPACK_FLIP_Y_WEBGL, 1);
+        gl.activeTexture( gl.TEXTTURE0 );
+        gl.bindTexture( gl.TEXTURE_CUBE_MAP, texture);
+        gl.texParameteri( gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texImage2D( gl.TEXTURE_CUBE_MAP, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+        gl.uniform1i( u_Sampler, 0);
+        gl.drawArrays( gl.TRIANGLE_STRIP, 0, n);
+        
+        /*image.onload = function() {
+            self.loadTexture(gl, n, texture, u_Sampler, this);
+        }
+        image.src = src;*/
+    },
+    loadImages : function( srcs, fn) {
+        var len = srcs.length, objs = [];
+        srcs.forEach( function( src, i) {
+            load( src, i);
+        } );
+        function load( src , i){
+            var img = new Image();
+            img.onload = function() {
+                objs[ i ] = img;
+                len-=1;
+                if( len == 0) {
+                    fn( objs );
+                }
+            }
+            img.src = src;
+        }
+    }
+};
+(function() {
+
+    var gl = util.getgl( '#js_canvas' ),
+        vertexShader = [
+            'attribute vec4 a_Position;',
+            'attribute vec2 a_TexCoord;',
+            'uniform mat4 u_MvpMatrix;',//透视模型视图矩阵
+            'varying vec2 v_TexCoord;',
+            'void main(){',
+            ' gl_Position = u_MvpMatrix * a_Position;',
+            ' v_TexCoord = a_TexCoord;',
+            '}'
+        ].join('\n'),
+        fragmentShader = [
+            'precision mediump float;',
+            'uniform sampler2D u_Sampler;',
+            'varying vec2 v_TexCoord;',
+            'void main(){',
+            ' gl_FragColor = texture2D(u_Sampler,v_TexCoord);',
+            '}'
+        ].join('\n'),
+        vertices = [//六个面定义
+            new Float32Array([//前 0
+                -1, 1, 1, 1, 1,//1
+                -1, -1, 1, 1, 0,//2
+                1, 1, 1, 0, 1,//3
+                1, -1, 1, 0, 0//4
+            ]),
+            new Float32Array([//后 1
+                -1, 1, -1, -1, 1,//5
+                -1, -1, -1, -1, 0,//6
+                1, 1, -1, 0, 1,//7
+                1, -1, -1, 0, 0//8
+            ]),
+            new Float32Array([//上 2
+                -1, 1, 1, -1, 1,//1
+                -1, 1, -1, -1, 0,//5
+                1, 1, 1, 0, 1,//3
+                1, 1, -1, 0, 0//7
+            ]),
+            new Float32Array([//下 3
+                -1, -1, -1, -1, 1,//6
+                -1, -1, 1, -1, 0,//2
+                1, -1, -1, 0, 1,//8
+                1, -1, 1, 0, 0//4
+            ]),
+            new Float32Array([//左 4
+                -1, 1, 1, -1, 1,//1
+                -1, -1, 1, -1, 0,//2
+                -1, 1, -1, 0, 1,//5
+                -1, -1, -1, 0, 0//6
+            ]),
+            new Float32Array([//右 5
+                1, 1, 1, 0, 1,//3
+                1, -1, 1, 0, 0,//4
+                1, 1, -1, -1, 1,//7
+                1, -1, -1, -1, 0//8
+            ])
+        ],
+        program;
+/*
+前：pano_r
+后：pano_l
+上：pano_u
+下：pano_d
+左：pano_b
+右：pano_f
+*/
+    util.loadImages(['img/pano_r.jpg', 'img/pano_l.jpg', 'img/pano_u.jpg', 'img/pano_d.jpg', 'img/pano_b.jpg', 'img/pano_f.jpg'], function( imgs ) {
+        program = util.initShader( gl, vertexShader, fragmentShader);
+        util.clear( gl );
+        var u_MvpMatrix = gl.getUniformLocation( program, 'u_MvpMatrix'),
+            viewMatrix = mat4.create(),//视图矩阵
+            proMatrix = mat4.create(),//投影矩阵
+            mvpMatrix,
+            g_near = 0.5, g_far = 300,rotateX=0,rotateY=0,
+            eysX = 0.5, eysY = 0.5, eysZ =0.5;
+        mat4.lookAt([eysX, eysY, eysZ],[0,0,0],[0,1,0], viewMatrix);
+        //mat4.ortho(-1, 1, -1, 1, g_near, g_far, proMatrix);
+        mat4.perspective(75, width / height, g_near, g_far, proMatrix);
+        mvpMatrix = mat4.multiply( proMatrix, viewMatrix);
+        //mat4.rotateX(mvpMatrix, 45 * Math.PI / 180 );
+        //mat4.rotateY(mvpMatrix, 45 * Math.PI / 180 );
+        gl.uniformMatrix4fv(u_MvpMatrix, false, mvpMatrix);
+        imgs.forEach( function( img , i) {//
+            //if(i == 0 || i == 1 || i == 4 || i == 2 || i == 3 || i == 5){
+                util.initVertexBuffers( gl, program, vertices[i], 'a_Position', 'a_TexCoord')
+                util.initTextures( gl, program, 4, 'u_Sampler', img);
+            //}
+        } );
+    i=0;
+    function animate() {
+        //rotateX +=0.001;
+        rotateY +=0.001;
+        i++ < 30 && requestAnimationFrame( animate );
+        mat4.rotateX(mvpMatrix, rotateX);
+        mat4.rotateY(mvpMatrix, rotateY);
+        //mat4.lookAt([eysX, eysY, eysZ],[0,0,0],[0,1,0], viewMatrix);
+        gl.uniformMatrix4fv( u_MvpMatrix , false, mvpMatrix);
+        imgs.forEach( function( img , i) {//
+            //if(i >0)return;
+            util.initVertexBuffers( gl, program, vertices[i], 'a_Position', 'a_TexCoord')
+            util.initTextures( gl, program, 4, 'u_Sampler', img);
+        } );
+    }
+    //animate();
+    document.addEventListener('keydown', function( e ){return;
+        var cut = 0.0314;
+        if(e.keyCode == 37) {//左
+            rotateY +=cut;
+        } else if( e.keyCode == 39 ) {
+            rotateY -=cut;
+        } else if( e.keyCode == 38) {
+            rotateX -=cut;
+        } else if( e.keyCode == 40 ) {
+            rotateX +=cut;
+        }
+        //document.getElementById( 'js_msg' ).innerHTML= 'eysX:'+eysX+'<br/>eysY:'+eysY;
+        //util.clear( gl );
+        //gl.clear(gl.COLOR_BUFFER_BIT);
+        mat4.rotateX(mvpMatrix, rotateX);
+        mat4.rotateY(mvpMatrix, rotateY);
+        //mat4.lookAt([eysX, eysY, eysZ],[0,0,0],[0,1,0], viewMatrix);
+        gl.uniformMatrix4fv( u_MvpMatrix , false, mvpMatrix);
+        gl.drawArrays( gl.TRIANGLE_STRIP, 0, n);
+        imgs.forEach( function( img , i) {//
+            //if(i >0)return;
+            util.initVertexBuffers( gl, program, vertices[i], 'a_Position', 'a_TexCoord')
+            util.initTextures( gl, program, 4, 'u_Sampler', img);
+        } );
+    }, false);
+        
+        
+    });
+    
+    //util.initVertexBuffers( gl, program, vertices, 'a_Position', 'a_TexCoord');
+    //util.initTextures( gl, program, 4, 'u_Sampler', 'img/pano_b.jpg');
+    /*
+        gl.POINTS
+        gl.LINES
+        gl.LINE_STRIP
+        gl.LINE_LOOP
+        gl.TRIANGLES
+        gl.TRIANGLE_STRIP
+        gl.TRIANGLE_FAN
+    */
+    console.log( gl.TEXTURE_CUBE_MAP );
+
+
+})()
+</script>
+
+</body>
+</html>

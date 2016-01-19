@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html;charset=utf-8">
+<title>样色渐变</title>
+</head>
+<body>
+    <div id="container" >
+        <canvas width="500" height="500" id="js_canvas"></canvas>
+    </div>
+<script>
+var util = {
+    /*
+        gl : 上下文
+        vertexShaderSource ： 定点着色器
+        fragmentShaderSource ： 片源着色器
+    */
+    initShader : function(gl, vertexShaderSource, fragmentShaderSource) {
+        var fragmentShader = this.createShader(gl, fragmentShaderSource, "fragment"),
+            vertexShader = this.createShader(gl, vertexShaderSource, "vertex"),
+            shaderProgram, shaderVertexPositionAttribute, shaderProjectionMatrixUniform,
+            shaderModelViewMatrixUniform;
+        // link them together into a new program
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            throw("Could not initialise shaders");
+            return null;
+        }
+        gl.useProgram( shaderProgram );
+        return shaderProgram;
+    },
+    createShader : function(gl, str, type) {
+        var shader;
+        if (type == "fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (type == "vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    },
+    initVertexBuffers : function( gl , program , vertices , key , color) {
+        var vertexBuffer = gl.createBuffer(),
+            varindex, a_color, FSIZE = vertices.BYTES_PER_ELEMENT;
+        if( !vertexBuffer ) {
+            throw 'Failed:缓冲区创建失败';
+            return null;
+        }
+        gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
+        gl.bufferData( gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        varindex = gl.getAttribLocation(program, key);
+        gl.vertexAttribPointer( varindex, 2, gl.FLOAT, false,  FSIZE * 5, 0);
+        gl.enableVertexAttribArray( varindex );
+        a_color = gl.getAttribLocation(program, color);
+        gl.vertexAttribPointer( a_color, 3, gl.FLOAT, false, FSIZE *5 , FSIZE * 2);
+        gl.enableVertexAttribArray( a_color );
+        return true;
+    },
+    getgl : function( selector ) {
+        var ele = document.querySelector( selector ),
+            gl = ele.getContext( 'webgl' );
+        return gl;
+    },
+    clear : function( gl ) {
+        gl.clearColor(.0, .0, .0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+};
+(function() {
+
+    var gl = util.getgl( '#js_canvas' ),
+        vertexShader = [
+            'attribute vec4 a_Position;',
+            'attribute vec4 a_Color;',
+            'varying vec4 v_Color;',
+            'void main(){',
+            ' gl_Position = a_Position;',
+            ' v_Color = a_Color;',
+            '}'
+        ].join('\n'),
+        fragmentShader = [
+            'precision mediump float;',
+            'varying vec4 v_Color;',
+            'void main(){',
+            ' gl_FragColor = v_Color;',
+            '}'
+        ].join('\n'),
+        key = 'TRIANGLES',
+        vertices = new Float32Array([-0.5, 0.5, 1, 0, 0, -0.5, -0.5, 0, 1, 0, 0.5, -0.5, 0, 0, 1]),
+        program, u_FragColor,
+        B = 45.0 / 180.0 * Math.PI,//旋转角度
+        cosB = Math.cos( B ), sinB = Math.sin( B ),
+        scaleX = 1.2, scaleY = 1.3, scaleZ = 1.4,//缩放参数
+        moveX = -0.2, moveY = 0.2, moveZ = 0.2,//平移参数
+        xformMatrix = [//旋转、平移矩阵
+            cosB * scaleX, sinB, 0.0, 0.0,
+            -sinB, cosB * scaleY, 0.0, 0.0,
+            0.0, 0.0, 1.0 * scaleZ, 0.0,
+            moveX, moveY, moveZ, 1.0
+        ];
+    util.clear( gl );
+    program = util.initShader( gl, vertexShader, fragmentShader);
+    util.initVertexBuffers( gl, program, vertices, 'a_Position', 'a_Color');
+    /*
+        gl.POINTS
+        gl.LINES
+        gl.LINE_STRIP
+        gl.LINE_LOOP
+        gl.TRIANGLES
+        gl.TRIANGLE_STRIP
+        gl.TRIANGLE_FAN
+    */
+    //gl.drawArrays( gl.LINE_LOOP, 0, 4);
+    gl.drawArrays( gl.TRIANGLES, 0, 3);
+
+
+})()
+</script>
+
+</body>
+</html>

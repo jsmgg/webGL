@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html;charset=utf-8">
+<title>画矩形-平移-旋转</title>
+</head>
+<body>
+    <div id="container" >
+        <canvas width="500" height="500" id="js_canvas"></canvas>
+    </div>
+<script>
+var util = {
+    /*
+        gl : 上下文
+        vertexShaderSource ： 定点着色器
+        fragmentShaderSource ： 片源着色器
+    */
+    initShader : function(gl, vertexShaderSource, fragmentShaderSource) {
+        var fragmentShader = this.createShader(gl, fragmentShaderSource, "fragment"),
+            vertexShader = this.createShader(gl, vertexShaderSource, "vertex"),
+            shaderProgram, shaderVertexPositionAttribute, shaderProjectionMatrixUniform,
+            shaderModelViewMatrixUniform;
+        // link them together into a new program
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            throw("Could not initialise shaders");
+            return null;
+        }
+        gl.useProgram( shaderProgram );
+        return shaderProgram;
+    },
+    createShader : function(gl, str, type) {
+        var shader;
+        if (type == "fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (type == "vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    },
+    initVertexBuffers : function( gl , program , vertices , key ) {
+        var vertexBuffer = gl.createBuffer(),
+            varindex;
+        if( !vertexBuffer ) {
+            throw 'Failed:缓冲区创建失败';
+            return null;
+        }
+        gl.bindBuffer( gl.ARRAY_BUFFER, vertexBuffer );
+        gl.bufferData( gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        varindex = gl.getAttribLocation(program, key);
+        gl.vertexAttribPointer( varindex, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray( varindex );
+        return true;
+    },
+    getgl : function( selector ) {
+        var ele = document.querySelector( selector ),
+            gl = ele.getContext( 'webgl' );
+        return gl;
+    },
+    clear : function( gl ) {
+        gl.clearColor(.0, .0, .0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+};
+(function() {
+
+    var gl = util.getgl( '#js_canvas' ),
+        vertexShader = [
+            'attribute vec4 a_Position;',
+            'uniform vec4 u_Translation;', //平移矩阵
+            'uniform float u_CosB, u_SinB;',//选择角度余弦、正弦值
+            'void main(){',
+            ' gl_Position.x = a_Position.x * u_CosB - a_Position.y * u_SinB + u_Translation.x;',
+            ' gl_Position.y = a_Position.x * u_SinB + a_Position.y * u_CosB + u_Translation.y;',
+            ' gl_Position.z = a_Position.z + u_Translation.z;',
+            ' gl_Position.w = 1.0 + u_Translation.w;',
+            '}'
+        ].join('\n'),
+        fragmentShader = [
+            'precision mediump float;',
+            'uniform vec4 u_FragColor;',
+            'void main(){',
+            ' gl_FragColor = u_FragColor;',
+            '}'
+        ].join('\n'),
+        key = 'TRIANGLE_FAN',
+        vertices = {
+            LINE_STRIP : new Float32Array([-0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5]),
+            LINE_LOOP : new Float32Array([-0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5]),
+            TRIANGLES : new Float32Array([-0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5]),
+            TRIANGLE_STRIP : new Float32Array([-0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5, -0.5]),
+            TRIANGLE_FAN : new Float32Array([-0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5])
+        }[key],
+        program, u_FragColor, u_Translation, u_CosB, u_SinB,
+        radian = 45.0 / 180.0 * Math.PI;//选择角度
+    util.clear( gl );
+    program = util.initShader( gl, vertexShader, fragmentShader);
+    util.initVertexBuffers( gl, program, vertices, 'a_Position');
+    u_FragColor = gl.getUniformLocation( program, 'u_FragColor');
+    u_Translation = gl.getUniformLocation( program, 'u_Translation');
+    u_CosB = gl.getUniformLocation( program, 'u_CosB');
+    u_SinB = gl.getUniformLocation( program, 'u_SinB');
+    gl.uniform4f( u_FragColor, 1.0, 0.0, 0.0, 1.0);
+    gl.uniform4f( u_Translation, 0.3, 0.3, 0.0, 0.0);//平移
+    gl.uniform1f( u_CosB, Math.cos( radian ));//旋转
+    gl.uniform1f( u_SinB, Math.sin( radian ));//旋转
+    /*
+        gl.POINTS
+        gl.LINES
+        gl.LINE_STRIP
+        gl.LINE_LOOP
+        gl.TRIANGLES
+        gl.TRIANGLE_STRIP
+        gl.TRIANGLE_FAN
+    */
+    //gl.drawArrays( gl.LINE_LOOP, 0, 4);
+    gl.drawArrays( gl[key], 0, key == 'LINE_STRIP' ? 5 : 4);
+
+
+})()
+</script>
+
+</body>
+</html>
