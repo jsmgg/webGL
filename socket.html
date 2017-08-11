@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html;charset=utf-8">
+<title>websocket</title>
+<style type="text/css">
+.tmpbottom{
+  width:100%;
+  height: 200px;
+}
+  .bottom{
+    width:100%;
+    height: 150px;
+    position: fixed;
+    bottom:0;
+    background: #fff;
+  }
+  textarea{
+    width:400px;
+    display: block;
+    height: 120px;
+    margin:0 auto;
+  }
+</style>
+</head>
+<body>
+<div id="text"></div>
+<div class="tmpbottom"></div>
+<div class="bottom">
+<textarea id="input" placeholder="在这里打字，然后回车"></textarea>
+</div>
+<script>
+  /*var socket = io.connect('http://localhost:3000/socket.io');
+  socket.on('news', function (data) {
+    console.log(data);
+    socket.emit('my other event', { my: 'data' });
+  });*/
+
+
+  /*var socket = io();
+  // 加入房间
+  socket.on('connect', function () {
+    socket.emit('news', '孩子们');
+  });
+  // 监听消息
+  socket.on('my other event', function (userName, msg) {
+    console.log(123123);
+  });*/
+// 创建一个Socket实例
+var socket = new WebSocket('ws://192.168.2.221:4000'); 
+var myName = '';
+while(!(myName = window.prompt('输入你的名字'))){
+
+}
+// 打开Socket 
+socket.onopen = function(event) {
+
+  // 发送一个初始化消息
+  socket.send(JSON.stringify({
+    userName : myName,
+    action:'telme'
+  })); 
+
+  // 监听消息
+  socket.onmessage = function(event) { 
+
+    var data = JSON.parse(event.data);
+    if( parseMSG[data.action] ) {
+      parseMSG[data.action]( data );
+    }
+  }; 
+
+  // 监听Socket的关闭
+  socket.onclose = function(event) { 
+    console.log('Client notified socket has closed',event); 
+  }; 
+
+  // 关闭Socket.... 
+  //socket.close() 
+  input.onkeyup=function(e){
+    if( e.keyCode == 13 ){
+      var val = this.value;
+      this.value = '';
+      var data = {userName:myName};
+      if( val.indexOf('@')==0 ){
+        var toUserName = val.substr(1,val.indexOf(' ')-1);
+        data.action='to';
+        data.value = val.substr(val.indexOf(' ')+1);
+        data.toUserName = toUserName;
+      }else {
+        data.action = 'all';
+        data.value = val;
+      }
+      
+      socket.send( JSON.stringify(data) );
+    }
+  }
+};
+
+function bind(p){
+  p.onclick=function(){
+    var val = input.value;
+    if( val.indexOf('@')==0 ){
+      val = val.substr(val.indexOf(' ')+1);
+    }
+    val = '@'+p.getAttribute('name')+' '+val;
+    input.value = val;
+  }
+}
+
+function clear(){
+  if(text.children.length>30){
+    text.innerHTML='';
+  }
+}
+var parseMSG = {
+  all( data ){
+    clear();
+    var p = document.createElement( 'p' );
+    p.innerText = (data.userName==myName?'你':data.userName)+'说:'+data.value;
+    p.setAttribute('name',data.userName);
+    text.append(p);
+    bind(p);
+  },
+  to( data ){
+    clear();
+    var p = document.createElement( 'p' );
+    p.innerText = (data.userName==myName?'你':data.userName)+'对'+(data.toUserName==myName?'你':data.toUserName)+'说:'+data.value;
+    p.setAttribute('name',data.userName);
+    text.append(p);
+    bind(p);
+  },
+  telme( data ){
+    myName = data.value;
+    input.setAttribute('name',data.value);
+  }
+}
+</script>
+</body>
+</html>
